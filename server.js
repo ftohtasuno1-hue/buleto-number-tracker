@@ -109,7 +109,8 @@ function startRound(d) {
   seenFactorTimes = new Set(); pendingFinal = null; console.log("Round started", id); scheduleFinish(); save();
 }
 function finishRound(rawFinal, ts = Date.now()) {
-  if (!currentRound) return;
+  if (!currentRound || currentRound.finished) return;
+  currentRound.finished = true;
   if (currentRound.lastNumber !== null && currentRound.lastSampleAt !== null) {
     const end = Date.parse(currentRound.endedAt);
     const finishAt = Number.isFinite(end) ? Math.min(ts, end) : ts;
@@ -130,9 +131,11 @@ function numberFromQuote(v, cls) {
   const x = cls.find(a => q >= Number(a.vf) && q < Number(a.vt)); return x ? norm(x.c) : 0;
 }
 function sample(q, dt, cls) {
-  if (!currentRound || !Array.isArray(cls) || !dt) return;
+  if (!currentRound || currentRound.finished || !Array.isArray(cls) || !dt) return;
   const stamp = Date.parse(dt), start = Date.parse(currentRound.startedAt), end = Date.parse(currentRound.endedAt);
-  if (!Number.isFinite(stamp) || stamp < start || (Number.isFinite(end) && stamp > end)) return;
+  if (!Number.isFinite(stamp) || stamp < start || (Number.isFinite(end) && stamp >= end)) return;
+  // Do not process/send anomaly notifications once the round's official end time has arrived.
+  if (currentRound.finished || (Number.isFinite(end) && Date.now() >= end)) return;
   const key = String(dt); if (seenFactorTimes.has(key)) return; seenFactorTimes.add(key);
   const n = numberFromQuote(q, cls); currentRound.rawSamples++;
   if (currentRound.lastNumber === null) {
