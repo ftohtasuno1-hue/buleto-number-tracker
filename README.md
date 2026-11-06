@@ -1,24 +1,21 @@
-# Buleto Number Tracker Worker
+# Buleto Number Tracker Worker v3 Direct
 
-Independent backend for the new tracker. It does not touch the existing Tracker.
+Railway worker attempts direct connection to `wss://buleto.com/ws` without browser relay.
+- auto reconnects every 5s
+- parses `round`, `factors`, `last-results`
+- quote-to-number via `cls` interval
+- 37 and out-of-range -> 0
+- deduplicates factor samples by `dt`
+- aggregates time per number and anomaly if total >15 sec
+- stores state in `/data/tracker-history.json` (set Railway Volume mount at `/data` for persistence)
 
-## Deploy on Railway
-Railway should detect `package.json` and run `npm start`.
+## Deploy
+1. Push files to new tracker repo (not old Tracker).
+2. Railway service start command `npm start`, port 8080.
+3. Add Railway Volume mounted at `/data` for persistence.
+4. Check `/api/status`, `/api/current`, `/api/history`.
 
-## Endpoints
-- `GET /` — service status
-- `GET /health` — health check
-- `GET /api/current` — active round
-- `GET /api/history` — completed rounds
-- `POST /api/round/start` — JSON: `{"roundId":"123"}`
-- `POST /api/number` — JSON: `{"number":12}`
-- `POST /api/round/finish` — JSON: `{"number":37}` (37 is normalized to 0)
+## Important validation
+This version must be validated against the actual upstream stream in Railway logs. It intentionally does not use browser cookies or user session tokens. If Buleto rejects unauthenticated server connections, it will show upstream error/close and will need a supported public feed/auth method.
 
-## Rules implemented
-- 37 -> 0
-- values outside 0..37 -> 0
-- total per-number display duration is summed during a round
-- anomaly when a number's total duration is strictly greater than 15 seconds
-
-## Current limitation
-This is the first backend scaffold. It does not connect to Buleto's upstream WebSocket yet. The next step is to add the verified Buleto feed adapter and persistent storage.
+`factors` payload structure may vary; confirm it from actual live messages before treating output as complete.

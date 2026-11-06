@@ -1,12 +1,13 @@
 {
   "name": "buleto-number-tracker-worker",
-  "version": "1.0.0",
-  "description": "Independent Buleto Number Tracker backend",
+  "version": "3.0.0",
+  "description": "Autonomous Buleto Number Tracker backend with direct upstream WebSocket",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
   }
 }
