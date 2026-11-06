@@ -1,7 +1,7 @@
 {
   "name": "buleto-number-tracker-worker",
-  "version": "3.0.0",
-  "description": "Autonomous Buleto Number Tracker backend with direct upstream WebSocket",
+  "version": "3.1.0",
+  "description": "Autonomous Buleto Number Tracker backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
