@@ -96,7 +96,7 @@ function scheduleFinish() {
   if (!Number.isFinite(end)) return;
   const delay = Math.max(0, end - Date.now());
   finishTimer = setTimeout(() => {
-    if (currentRound && Date.now() >= Date.parse(currentRound.endedAt)) finishRound(pendingFinal, Date.parse(currentRound.endedAt));
+    if (currentRound && !currentRound.finished && Number.isFinite(Date.parse(currentRound.endedAt)) && Date.now() >= Date.parse(currentRound.endedAt)) finishRound(pendingFinal, Date.parse(currentRound.endedAt));
   }, Math.min(delay + 50, 2147480000));
 }
 function startRound(d) {
@@ -109,7 +109,8 @@ function startRound(d) {
   seenFactorTimes = new Set(); pendingFinal = null; console.log("Round started", id); scheduleFinish(); save();
 }
 function finishRound(rawFinal, ts = Date.now()) {
-  if (!currentRound) return;
+  if (!currentRound || currentRound.finished) return;
+  currentRound.finished = true;
   if (currentRound.lastNumber !== null && currentRound.lastSampleAt !== null) {
     const end = Date.parse(currentRound.endedAt);
     const finishAt = Number.isFinite(end) ? Math.min(ts, end) : ts;
@@ -118,7 +119,8 @@ function finishRound(rawFinal, ts = Date.now()) {
     if (currentRound.totals[n] > 25 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
   }
   if (rawFinal !== undefined && rawFinal !== null) currentRound.finalNumber = norm(rawFinal);
-  currentRound.endedAt = new Date(ts).toISOString();
+  const officialEnd = Date.parse(currentRound.endedAt);
+  currentRound.endedAt = new Date(Number.isFinite(officialEnd) ? officialEnd : ts).toISOString();
   if (!history.some(r => String(r.roundId) === String(currentRound.roundId))) {
     history.unshift(currentRound); if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
     console.log("Round finished", currentRound.roundId, "final", currentRound.finalNumber);
@@ -130,9 +132,11 @@ function numberFromQuote(v, cls) {
   const x = cls.find(a => q >= Number(a.vf) && q < Number(a.vt)); return x ? norm(x.c) : 0;
 }
 function sample(q, dt, cls) {
-  if (!currentRound || !Array.isArray(cls) || !dt) return;
+  if (!currentRound || currentRound.finished || !Array.isArray(cls) || !dt) return;
   const stamp = Date.parse(dt), start = Date.parse(currentRound.startedAt), end = Date.parse(currentRound.endedAt);
-  if (!Number.isFinite(stamp) || stamp < start || (Number.isFinite(end) && stamp > end)) return;
+  if (!Number.isFinite(stamp) || stamp < start || (Number.isFinite(end) && stamp >= end)) return;
+  // Once the official round end has passed, ignore late factors from Buleto.
+  if (Number.isFinite(end) && Date.now() >= end) return;
   const key = String(dt); if (seenFactorTimes.has(key)) return; seenFactorTimes.add(key);
   const n = numberFromQuote(q, cls); currentRound.rawSamples++;
   if (currentRound.lastNumber === null) {
