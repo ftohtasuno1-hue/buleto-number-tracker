@@ -104,7 +104,7 @@ function startRound(d) {
   currentRound = {
     roundId: id, startedAt: d.sd || new Date(start).toISOString(), bettingCloseAt: d.bcd || null,
     endedAt: d.ed || null, cls: Array.isArray(d.cls) ? d.cls : [], sequence: [], totals: {},
-    anomalies: [], lastNumber: null, lastSampleAt: null, finalNumber: null, rawSamples: 0, source: "buleto-ws"
+    anomalies: [], notifiedAnomalies: [], lastNumber: null, lastSampleAt: null, finalNumber: null, rawSamples: 0, source: "buleto-ws"
   };
   seenFactorTimes = new Set(); pendingFinal = null; console.log("Round started", id); scheduleFinish(); save();
 }
@@ -116,6 +116,7 @@ function finishRound(rawFinal, ts = Date.now()) {
     const elapsed = Math.max(0, finishAt - currentRound.lastSampleAt) / 1000, n = currentRound.lastNumber;
     currentRound.totals[n] = (currentRound.totals[n] || 0) + elapsed;
     if (currentRound.totals[n] > 15 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
+    if (!currentRound.notifiedAnomalies?.includes(n)) { currentRound.notifiedAnomalies = currentRound.notifiedAnomalies || []; currentRound.notifiedAnomalies.push(n); sendPush({title: "⚠️ Аномалия Buleto", body: `Раунд ${currentRound.roundId}: номер ${n} — время больше 15 сек`, url: "/", tag: `anomaly-${currentRound.roundId}-${n}`}).catch(e=>console.error("Anomaly push error",e.message)); }
   }
   if (rawFinal !== undefined && rawFinal !== null) currentRound.finalNumber = norm(rawFinal);
   currentRound.endedAt = new Date(ts).toISOString();
@@ -144,6 +145,7 @@ function sample(q, dt, cls) {
     currentRound.totals[prev] = (currentRound.totals[prev] || 0) + elapsed;
     if (currentRound.totals[prev] > 15 && !currentRound.anomalies.includes(prev)) {
       currentRound.anomalies.push(prev); console.log("ANOMALY >15 sec", prev, currentRound.roundId);
+      if (!currentRound.notifiedAnomalies.includes(prev)) { currentRound.notifiedAnomalies.push(prev); sendPush({title: "⚠️ Аномалия Buleto", body: `Раунд ${currentRound.roundId}: номер ${prev} — время больше 15 сек`, url: "/", tag: `anomaly-${currentRound.roundId}-${prev}`}).then(r=>console.log("Anomaly push", r)).catch(e=>console.error("Anomaly push error",e.message)); }
     }
     if (n !== prev) currentRound.sequence.push({ number: n, at: new Date(stamp).toISOString(), quote: Number(q) });
     currentRound.lastNumber = n; currentRound.lastSampleAt = stamp;
