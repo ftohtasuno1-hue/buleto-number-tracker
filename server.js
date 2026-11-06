@@ -116,7 +116,6 @@ function finishRound(rawFinal, ts = Date.now()) {
     const elapsed = Math.max(0, finishAt - currentRound.lastSampleAt) / 1000, n = currentRound.lastNumber;
     currentRound.totals[n] = (currentRound.totals[n] || 0) + elapsed;
     if (currentRound.totals[n] > 15 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
-    if (!currentRound.notifiedAnomalies?.includes(n)) { currentRound.notifiedAnomalies = currentRound.notifiedAnomalies || []; currentRound.notifiedAnomalies.push(n); sendPush({title: "⚠️ Аномалия Buleto", body: `Раунд ${currentRound.roundId}: номер ${n} — время больше 15 сек`, url: "/", tag: `anomaly-${currentRound.roundId}-${n}`}).catch(e=>console.error("Anomaly push error",e.message)); }
   }
   if (rawFinal !== undefined && rawFinal !== null) currentRound.finalNumber = norm(rawFinal);
   currentRound.endedAt = new Date(ts).toISOString();
@@ -145,7 +144,19 @@ function sample(q, dt, cls) {
     currentRound.totals[prev] = (currentRound.totals[prev] || 0) + elapsed;
     if (currentRound.totals[prev] > 15 && !currentRound.anomalies.includes(prev)) {
       currentRound.anomalies.push(prev); console.log("ANOMALY >15 sec", prev, currentRound.roundId);
-      if (!currentRound.notifiedAnomalies.includes(prev)) { currentRound.notifiedAnomalies.push(prev); sendPush({title: "⚠️ Аномалия Buleto", body: `Раунд ${currentRound.roundId}: номер ${prev} — время больше 15 сек`, url: "/", tag: `anomaly-${currentRound.roundId}-${prev}`}).then(r=>console.log("Anomaly push", r)).catch(e=>console.error("Anomaly push error",e.message)); }
+      currentRound.notifiedAnomalies = currentRound.notifiedAnomalies || [];
+      if (!currentRound.notifiedAnomalies.includes(prev)) {
+        // Mark and persist before sending: repeated factors/reconnects cannot trigger duplicates.
+        currentRound.notifiedAnomalies.push(prev);
+        save();
+        sendPush({
+          title: "⚠️ Аномалия Buleto",
+          body: `Раунд ${currentRound.roundId} · номер ${prev} · более 15 секунд`,
+          url: "/",
+          tag: `anomaly-${currentRound.roundId}-${prev}`,
+          renotify: false
+        }).then(r=>console.log("Anomaly push", r)).catch(e=>console.error("Anomaly push error",e.message));
+      }
     }
     if (n !== prev) currentRound.sequence.push({ number: n, at: new Date(stamp).toISOString(), quote: Number(q) });
     currentRound.lastNumber = n; currentRound.lastSampleAt = stamp;
@@ -188,7 +199,7 @@ function connect() {
   upstream.on("close", (c, r) => { upstreamStatus = `closed ${c} ${r}`; console.log(upstreamStatus); reconnectTimer = setTimeout(connect, 5000); });
 }
 
-load(); loadSubscriptions(); if (currentRound) scheduleFinish(); connect();
+load(); loadSubscriptions(); if (currentRound) { currentRound.notifiedAnomalies = currentRound.notifiedAnomalies || []; scheduleFinish(); } connect();
 
 app.get("/", (_, res) => res.json({ service: "Buleto Number Tracker Worker", version: "3.5.0", upstream: upstreamStatus, round: currentRound?.roundId || null }));
 app.get("/health", (_, res) => res.json({ ok: true, service: "buleto-number-tracker", upstream: upstreamStatus, lastMessage: lastMessageAt }));
