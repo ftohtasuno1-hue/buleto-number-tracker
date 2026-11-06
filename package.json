@@ -1,12 +1,13 @@
 {
   "name": "buleto-number-tracker-worker",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.21.2",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "web-push": "^3.6.7"
   }
 }
