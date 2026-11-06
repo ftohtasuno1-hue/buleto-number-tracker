@@ -109,14 +109,13 @@ function startRound(d) {
   seenFactorTimes = new Set(); pendingFinal = null; console.log("Round started", id); scheduleFinish(); save();
 }
 function finishRound(rawFinal, ts = Date.now()) {
-  if (!currentRound || currentRound.finished) return;
-  currentRound.finished = true;
+  if (!currentRound) return;
   if (currentRound.lastNumber !== null && currentRound.lastSampleAt !== null) {
     const end = Date.parse(currentRound.endedAt);
     const finishAt = Number.isFinite(end) ? Math.min(ts, end) : ts;
     const elapsed = Math.max(0, finishAt - currentRound.lastSampleAt) / 1000, n = currentRound.lastNumber;
     currentRound.totals[n] = (currentRound.totals[n] || 0) + elapsed;
-    if (currentRound.totals[n] > 15 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
+    if (currentRound.totals[n] > 25 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
   }
   if (rawFinal !== undefined && rawFinal !== null) currentRound.finalNumber = norm(rawFinal);
   currentRound.endedAt = new Date(ts).toISOString();
@@ -131,11 +130,9 @@ function numberFromQuote(v, cls) {
   const x = cls.find(a => q >= Number(a.vf) && q < Number(a.vt)); return x ? norm(x.c) : 0;
 }
 function sample(q, dt, cls) {
-  if (!currentRound || currentRound.finished || !Array.isArray(cls) || !dt) return;
+  if (!currentRound || !Array.isArray(cls) || !dt) return;
   const stamp = Date.parse(dt), start = Date.parse(currentRound.startedAt), end = Date.parse(currentRound.endedAt);
-  if (!Number.isFinite(stamp) || stamp < start || (Number.isFinite(end) && stamp >= end)) return;
-  // Do not process/send anomaly notifications once the round's official end time has arrived.
-  if (currentRound.finished || (Number.isFinite(end) && Date.now() >= end)) return;
+  if (!Number.isFinite(stamp) || stamp < start || (Number.isFinite(end) && stamp > end)) return;
   const key = String(dt); if (seenFactorTimes.has(key)) return; seenFactorTimes.add(key);
   const n = numberFromQuote(q, cls); currentRound.rawSamples++;
   if (currentRound.lastNumber === null) {
@@ -145,7 +142,7 @@ function sample(q, dt, cls) {
     const prev = currentRound.lastNumber;
     const elapsed = Math.max(0, stamp - (currentRound.lastSampleAt ?? stamp)) / 1000;
     currentRound.totals[prev] = (currentRound.totals[prev] || 0) + elapsed;
-    if (currentRound.totals[prev] > 15 && !currentRound.anomalies.includes(prev)) {
+    if (currentRound.totals[prev] > 25 && !currentRound.anomalies.includes(prev)) {
       currentRound.anomalies.push(prev); console.log("ANOMALY >15 sec", prev, currentRound.roundId);
       currentRound.notifiedAnomalies = currentRound.notifiedAnomalies || [];
       if (!currentRound.notifiedAnomalies.includes(prev)) {
@@ -154,7 +151,7 @@ function sample(q, dt, cls) {
         save();
         sendPush({
           title: "⚠️ Аномалия Buleto",
-          body: `Раунд ${currentRound.roundId} · номер ${prev} · более 15 секунд`,
+          body: `Раунд ${currentRound.roundId} · номер ${prev} · более 25 секунд`,
           url: "/",
           tag: `anomaly-${currentRound.roundId}-${prev}`,
           renotify: false
