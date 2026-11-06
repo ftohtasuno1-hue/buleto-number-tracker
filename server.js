@@ -3,7 +3,20 @@ const WebSocket = require("ws");
 const fs = require("fs");
 const path = require("path");
 
-const app=express(); app.use(express.json({limit:"2mb"}));
+const app=express();
+const allowedOrigins = (process.env.CORS_ORIGIN || "*").split(",").map(x=>x.trim()).filter(Boolean);
+app.use((req,res,next)=>{
+  const origin=req.headers.origin;
+  if(!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)){
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+    res.setHeader("Vary","Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods","GET,HEAD,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");
+  if(req.method==="OPTIONS") return res.sendStatus(204);
+  next();
+});
+app.use(express.json({limit:"2mb"}));
 const PORT=process.env.PORT||8080, UPSTREAM=process.env.BULETO_WS_URL||"wss://buleto.com/ws";
 const DATA_DIR=process.env.DATA_DIR||"/data", STORE=path.join(DATA_DIR,"tracker-history.json"), MAX_HISTORY=2000;
 let currentRound=null,history=[],upstreamStatus="connecting",lastMessageAt=null,upstream,reconnectTimer,pendingFinal=null;
@@ -82,8 +95,8 @@ function connect(){clearTimeout(reconnectTimer);upstreamStatus="connecting";cons
  upstream.on("close",(c,r)=>{upstreamStatus=`closed ${c} ${r}`;console.log(upstreamStatus);reconnectTimer=setTimeout(connect,5000);});
 }
 load();if(currentRound)scheduleFinish();connect();
-app.get("/",(_,r)=>r.json({service:"Buleto Number Tracker Worker",version:"3.2.0",upstream:upstreamStatus,round:currentRound?.roundId||null}));
+app.get("/",(_,r)=>r.json({service:"Buleto Number Tracker Worker",version:"3.4.0",upstream:upstreamStatus,round:currentRound?.roundId||null}));
 app.get("/health",(_,r)=>r.json({ok:true,service:"buleto-number-tracker",upstream:upstreamStatus,lastMessage:lastMessageAt}));
 app.get("/api/status",(_,r)=>r.json({upstream:upstreamStatus,lastMessage:lastMessageAt,currentRound:currentRound?.roundId||null,samples:currentRound?.rawSamples||0}));
 app.get("/api/current",(_,r)=>r.json(currentRound));app.get("/api/history",(_,r)=>r.json(history));
-app.listen(PORT,()=>console.log("Buleto Number Tracker v3.3 listening",PORT));
+app.listen(PORT,()=>console.log("Buleto Number Tracker v3.4 listening",PORT));

@@ -1,13 +1,12 @@
-# Buleto Number Tracker Worker v3.2
+# Buleto Number Tracker Worker v3.4
 
-Direct upstream WebSocket: `wss://buleto.com/ws` (no browser bridge).
-- Filters factor samples to current round time window `sd` through `ed`.
-- Deduplicates `dt`.
-- Same round updates do not reset state.
-- `last-results` is pending; finalization occurs at round end (`ed`) or next round transition, not on every repeated result message.
-- Prevents duplicate round IDs in history.
-- 37 and values outside 0..36 normalize to 0.
-- Totals by number and anomaly strictly >15 seconds.
-- Persist `/data/tracker-history.json`; Railway Volume mount `/data` recommended.
-Endpoints: `/health`, `/api/status`, `/api/current`, `/api/history`.
-\n\n## v3.3 fix\nDuration is accumulated per sample interval exactly once; repeated samples of the same number no longer double-count overlapping time. Round finishing is capped at the configured round end.\n
+- Direct Buleto WebSocket: `wss://buleto.com/ws`
+- Adds CORS middleware for the Netlify frontend (default `CORS_ORIGIN=*`).
+- OPTIONS preflight is answered with 204.
+- Existing v3.3 sample duration logic retained.
+- Endpoints: `/health`, `/api/status`, `/api/current`, `/api/history`
+
+## Deploy on Railway
+Upload/replace `server.js`, `package.json`, and this README in the project/repository, then redeploy.
+Optional Railway variable `CORS_ORIGIN`: comma-separated allowed origins, e.g. `https://YOUR-SITE.netlify.app`.
+Leave unset to allow all origins (API is public/read-only).
