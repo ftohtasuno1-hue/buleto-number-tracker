@@ -10,3 +10,4 @@ Direct upstream WebSocket: `wss://buleto.com/ws` (no browser bridge).
 - Totals by number and anomaly strictly >15 seconds.
 - Persist `/data/tracker-history.json`; Railway Volume mount `/data` recommended.
 Endpoints: `/health`, `/api/status`, `/api/current`, `/api/history`.
+\n\n## v3.3 fix\nDuration is accumulated per sample interval exactly once; repeated samples of the same number no longer double-count overlapping time. Round finishing is capped at the configured round end.\n

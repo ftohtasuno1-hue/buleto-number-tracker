@@ -21,13 +21,15 @@ function scheduleFinish(){
 }
 function startRound(d){
  const id=String(d.id??d.roundId??Date.now()), start=Date.parse(d.sd)||Date.now();
- currentRound={roundId:id,startedAt:d.sd||new Date(start).toISOString(),bettingCloseAt:d.bcd||null,endedAt:d.ed||null,cls:Array.isArray(d.cls)?d.cls:[],sequence:[],totals:{},anomalies:[],lastNumber:null,lastChangeAt:null,finalNumber:null,rawSamples:0,source:"buleto-ws"};
+ currentRound={roundId:id,startedAt:d.sd||new Date(start).toISOString(),bettingCloseAt:d.bcd||null,endedAt:d.ed||null,cls:Array.isArray(d.cls)?d.cls:[],sequence:[],totals:{},anomalies:[],lastNumber:null,lastSampleAt:null,finalNumber:null,rawSamples:0,source:"buleto-ws"};
  seenFactorTimes=new Set();pendingFinal=null;console.log("Round started",id);scheduleFinish();save();
 }
 function finishRound(rawFinal,ts=Date.now()){
  if(!currentRound)return;
- if(currentRound.lastNumber!==null&&currentRound.lastChangeAt!==null){
-  const elapsed=Math.max(0,ts-currentRound.lastChangeAt)/1000, n=currentRound.lastNumber;
+ if(currentRound.lastNumber!==null&&currentRound.lastSampleAt!==null){
+  const end=Date.parse(currentRound.endedAt);
+  const finishAt=Number.isFinite(end)?Math.min(ts,end):ts;
+  const elapsed=Math.max(0,finishAt-currentRound.lastSampleAt)/1000, n=currentRound.lastNumber;
   currentRound.totals[n]=(currentRound.totals[n]||0)+elapsed;
   if(currentRound.totals[n]>15&&!currentRound.anomalies.includes(n))currentRound.anomalies.push(n);
  }
@@ -44,12 +46,19 @@ function sample(q,dt,cls){
  if(!Number.isFinite(stamp)||stamp<start||(Number.isFinite(end)&&stamp>end))return;
  const key=String(dt);if(seenFactorTimes.has(key))return;seenFactorTimes.add(key);
  const n=numberFromQuote(q,cls);currentRound.rawSamples++;
- if(currentRound.lastNumber===null){currentRound.lastNumber=n;currentRound.lastChangeAt=stamp;currentRound.sequence.push({number:n,at:new Date(stamp).toISOString(),quote:Number(q)});}
- else{
-  const prev=currentRound.lastNumber,elapsed=Math.max(0,stamp-currentRound.lastChangeAt)/1000;
+ if(currentRound.lastNumber===null){
+  currentRound.lastNumber=n;currentRound.lastSampleAt=stamp;
+  currentRound.sequence.push({number:n,at:new Date(stamp).toISOString(),quote:Number(q)});
+ } else {
+  const prev=currentRound.lastNumber;
+  // Count only the interval since the immediately previous sample (no overlap).
+  const elapsed=Math.max(0,stamp-(currentRound.lastSampleAt??stamp))/1000;
   currentRound.totals[prev]=(currentRound.totals[prev]||0)+elapsed;
-  if(currentRound.totals[prev]>15&&!currentRound.anomalies.includes(prev)){currentRound.anomalies.push(prev);console.log("ANOMALY >15 sec",prev,currentRound.roundId);}
-  if(n!==prev){currentRound.sequence.push({number:n,at:new Date(stamp).toISOString(),quote:Number(q)});currentRound.lastNumber=n;currentRound.lastChangeAt=stamp;}
+  if(currentRound.totals[prev]>15&&!currentRound.anomalies.includes(prev)){
+   currentRound.anomalies.push(prev);console.log("ANOMALY >15 sec",prev,currentRound.roundId);
+  }
+  if(n!==prev)currentRound.sequence.push({number:n,at:new Date(stamp).toISOString(),quote:Number(q)});
+  currentRound.lastNumber=n;currentRound.lastSampleAt=stamp;
  }
  save();
 }
@@ -77,4 +86,4 @@ app.get("/",(_,r)=>r.json({service:"Buleto Number Tracker Worker",version:"3.2.0
 app.get("/health",(_,r)=>r.json({ok:true,service:"buleto-number-tracker",upstream:upstreamStatus,lastMessage:lastMessageAt}));
 app.get("/api/status",(_,r)=>r.json({upstream:upstreamStatus,lastMessage:lastMessageAt,currentRound:currentRound?.roundId||null,samples:currentRound?.rawSamples||0}));
 app.get("/api/current",(_,r)=>r.json(currentRound));app.get("/api/history",(_,r)=>r.json(history));
-app.listen(PORT,()=>console.log("Buleto Number Tracker v3.2 listening",PORT));
+app.listen(PORT,()=>console.log("Buleto Number Tracker v3.3 listening",PORT));
