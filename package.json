@@ -1,6 +1,6 @@
 {
   "name": "buleto-number-tracker-worker",
-  "version": "3.5.4",
+  "version": "3.5.5",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
