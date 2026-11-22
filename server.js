@@ -116,7 +116,7 @@ function finishRound(rawFinal, ts = Date.now()) {
     const finishAt = Number.isFinite(end) ? Math.min(ts, end) : ts;
     const elapsed = Math.max(0, finishAt - currentRound.lastSampleAt) / 1000, n = currentRound.lastNumber;
     currentRound.totals[n] = (currentRound.totals[n] || 0) + elapsed;
-    if (n === 0 && currentRound.totals[n] > 10 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
+    if (n === 0 && currentRound.totals[n] > 35 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
   }
   if (rawFinal !== undefined && rawFinal !== null) currentRound.finalNumber = norm(rawFinal);
   const officialEnd = Date.parse(currentRound.endedAt);
@@ -146,8 +146,8 @@ function sample(q, dt, cls) {
     const prev = currentRound.lastNumber;
     const elapsed = Math.max(0, stamp - (currentRound.lastSampleAt ?? stamp)) / 1000;
     currentRound.totals[prev] = (currentRound.totals[prev] || 0) + elapsed;
-    if (prev === 0 && currentRound.totals[prev] > 10 && !currentRound.anomalies.includes(prev)) {
-      currentRound.anomalies.push(prev); console.log("ANOMALY >10 sec", prev, currentRound.roundId);
+    if (prev === 0 && currentRound.totals[prev] > 35 && !currentRound.anomalies.includes(prev)) {
+      currentRound.anomalies.push(prev); console.log("ANOMALY >35 sec", prev, currentRound.roundId);
       currentRound.notifiedAnomalies = currentRound.notifiedAnomalies || [];
       if (!currentRound.notifiedAnomalies.includes(prev)) {
         // Mark and persist before sending: repeated factors/reconnects cannot trigger duplicates.
@@ -155,7 +155,7 @@ function sample(q, dt, cls) {
         save();
         sendPush({
           title: "⚠️ Аномалия Buleto",
-          body: `Раунд ${currentRound.roundId} · номер ${prev} · более 10 секунд`,
+          body: `Раунд ${currentRound.roundId} · номер ${prev} · более 35 секунд`,
           url: "/",
           tag: `anomaly-${currentRound.roundId}-${prev}`,
           renotify: false
