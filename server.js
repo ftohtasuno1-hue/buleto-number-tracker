@@ -73,6 +73,21 @@ async function sendPush(payload) {
   saveSubscriptions();
   return { sent };
 }
+
+function notifyAnomaly(round, number) {
+  round.notifiedAnomalies = round.notifiedAnomalies || [];
+  if (round.notifiedAnomalies.includes(number)) return;
+  // Mark and persist before sending so reconnects/finalization cannot duplicate the alert.
+  round.notifiedAnomalies.push(number);
+  save();
+  sendPush({
+    title: "⚠️ Аномалия Buleto",
+    body: `Раунд ${round.roundId} · номер ${number} · более 30 секунд`,
+    url: "/",
+    tag: `anomaly-${round.roundId}-${number}`,
+    renotify: false
+  }).then(r => console.log("Anomaly push", r)).catch(e => console.error("Anomaly push error", e.message));
+}
 function norm(raw) { const n = Number(raw); return !Number.isFinite(n) || n < 0 || n >= 37 ? 0 : Math.trunc(n); }
 function save() {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(STORE, JSON.stringify({ history, currentRound, pendingFinal }, null, 2)); }
@@ -116,7 +131,10 @@ function finishRound(rawFinal, ts = Date.now()) {
     const finishAt = Number.isFinite(end) ? Math.min(ts, end) : ts;
     const elapsed = Math.max(0, finishAt - currentRound.lastSampleAt) / 1000, n = currentRound.lastNumber;
     currentRound.totals[n] = (currentRound.totals[n] || 0) + elapsed;
-    if (n === 0 && currentRound.totals[n] > 35 && !currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
+    if (n === 0 && currentRound.totals[n] > 30) {
+      if (!currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
+      notifyAnomaly(currentRound, n);
+    }
   }
   if (rawFinal !== undefined && rawFinal !== null) currentRound.finalNumber = norm(rawFinal);
   const officialEnd = Date.parse(currentRound.endedAt);
@@ -146,21 +164,10 @@ function sample(q, dt, cls) {
     const prev = currentRound.lastNumber;
     const elapsed = Math.max(0, stamp - (currentRound.lastSampleAt ?? stamp)) / 1000;
     currentRound.totals[prev] = (currentRound.totals[prev] || 0) + elapsed;
-    if (prev === 0 && currentRound.totals[prev] > 35 && !currentRound.anomalies.includes(prev)) {
-      currentRound.anomalies.push(prev); console.log("ANOMALY >35 sec", prev, currentRound.roundId);
-      currentRound.notifiedAnomalies = currentRound.notifiedAnomalies || [];
-      if (!currentRound.notifiedAnomalies.includes(prev)) {
-        // Mark and persist before sending: repeated factors/reconnects cannot trigger duplicates.
-        currentRound.notifiedAnomalies.push(prev);
-        save();
-        sendPush({
-          title: "⚠️ Аномалия Buleto",
-          body: `Раунд ${currentRound.roundId} · номер ${prev} · более 35 секунд`,
-          url: "/",
-          tag: `anomaly-${currentRound.roundId}-${prev}`,
-          renotify: false
-        }).then(r=>console.log("Anomaly push", r)).catch(e=>console.error("Anomaly push error",e.message));
-      }
+    if (prev === 0 && currentRound.totals[prev] > 30 && !currentRound.anomalies.includes(prev)) {
+      currentRound.anomalies.push(prev);
+      console.log("ANOMALY >30 sec", prev, currentRound.roundId);
+      notifyAnomaly(currentRound, prev);
     }
     if (n !== prev) currentRound.sequence.push({ number: n, at: new Date(stamp).toISOString(), quote: Number(q) });
     currentRound.lastNumber = n; currentRound.lastSampleAt = stamp;
