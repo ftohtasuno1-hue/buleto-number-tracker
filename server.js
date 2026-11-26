@@ -82,7 +82,7 @@ function notifyAnomaly(round, number) {
   save();
   sendPush({
     title: "⚠️ Аномалия Buleto",
-    body: `Раунд ${round.roundId} · номер ${number} · более 30 секунд`,
+    body: `Раунд ${round.roundId} · номер ${number} · более 25 секунд`,
     url: "/",
     tag: `anomaly-${round.roundId}-${number}`,
     renotify: false
@@ -131,7 +131,7 @@ function finishRound(rawFinal, ts = Date.now()) {
     const finishAt = Number.isFinite(end) ? Math.min(ts, end) : ts;
     const elapsed = Math.max(0, finishAt - currentRound.lastSampleAt) / 1000, n = currentRound.lastNumber;
     currentRound.totals[n] = (currentRound.totals[n] || 0) + elapsed;
-    if (n === 0 && currentRound.totals[n] > 30) {
+    if (n === 0 && currentRound.totals[n] > 25) {
       if (!currentRound.anomalies.includes(n)) currentRound.anomalies.push(n);
       notifyAnomaly(currentRound, n);
     }
@@ -164,9 +164,9 @@ function sample(q, dt, cls) {
     const prev = currentRound.lastNumber;
     const elapsed = Math.max(0, stamp - (currentRound.lastSampleAt ?? stamp)) / 1000;
     currentRound.totals[prev] = (currentRound.totals[prev] || 0) + elapsed;
-    if (prev === 0 && currentRound.totals[prev] > 30 && !currentRound.anomalies.includes(prev)) {
+    if (prev === 0 && currentRound.totals[prev] > 25 && !currentRound.anomalies.includes(prev)) {
       currentRound.anomalies.push(prev);
-      console.log("ANOMALY >30 sec", prev, currentRound.roundId);
+      console.log("ANOMALY >25 sec", prev, currentRound.roundId);
       notifyAnomaly(currentRound, prev);
     }
     if (n !== prev) currentRound.sequence.push({ number: n, at: new Date(stamp).toISOString(), quote: Number(q) });
